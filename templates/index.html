@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exchange Rate Chart</title>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container mt-5">
+<div class="row justify-content-center">
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h2 class="text-center">Exchange Rate Chart</h2>
+</div>
+<div class="card-body">
+
+<form id="currencyForm">
+<div class="form-group">
+<label for="fromCurrency">From Currency:</label>
+<select class="form-control" id="fromCurrency" name="fromCurrency" required>
+                                {% for currency in currencies %}
+<option value="{{ currency }}">{{ currency }}</option>
+                                {% endfor %}
+</select>
+</div>
+<div class="form-group">
+<label for="toCurrency">To Currency:</label>
+<select class="form-control" id="toCurrency" name="toCurrency" required>
+                                {% for currency in currencies %}
+<option value="{{ currency }}">{{ currency }}</option>
+                                {% endfor %}
+</select>
+</div>
+<button type="submit" class="btn btn-primary btn-block">Get Exchange Rate</button>
+</form>
+<canvas id="exchangeRateChart" class="mt-4"></canvas>
+<div id="statisticsDiv" class="mt-4"></div>
+<div id="tableDiv" class="mt-4"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+document.getElementById('currencyForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    let fromCurrency = document.getElementById('fromCurrency').value;
+    let toCurrency = document.getElementById('toCurrency').value;
+    try {
+        const response = await fetch('/get_exchange_rate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                from_currency: fromCurrency,
+                to_currency: toCurrency
+            })
+        });
+        const data = await response.json();
+        let dates = data.dates;
+        let rates = data.rates;
+        let ctx = document.getElementById('exchangeRateChart').getContext('2d');
+        let exchangeRateChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: `${fromCurrency} to ${toCurrency} Exchange Rate Over the Past Two Months`,
+                    data: rates,
+                    borderColor: 'blue',
+                    borderWidth: 1,
+                    fill: false
+                }]
+            },
+            options: {
+                scales: {
+                    xAxes: [{
+                        type: 'time',
+                        time: {
+                            unit: 'day',
+                            tooltipFormat: 'ddd, DD MMM YYYY',
+                            displayFormats: {
+                                day: 'ddd, DD MMM YYYY'
+                            }
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Date'
+                        }
+                    }],
+                    yAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Exchange Rate'
+                        }
+                    }]
+                }
+            }
+        });
+        let statisticsHtml = `
+<h4>Statistics:</h4>
+<ul>
+<li>Maximum Rate: ${data.statistics.max_rate}</li>
+<li>Minimum Rate: ${data.statistics.min_rate}</li>
+<li>Average Rate: ${data.statistics.avg_rate}</li>
+<li>Average Growth Rate: ${data.statistics.avg_growth_rate}</li>
+<li>Average Decline Rate: ${data.statistics.avg_decline_rate}</li>
+</ul>
+            `;
+        document.getElementById('statisticsDiv').innerHTML = statisticsHtml;
+        let tableHtml = `
+<h4>Data Table:</h4>
+<table class="table">
+<thead>
+<tr>
+<th>Date</th>
+<th>Exchange Rate</th>
+</tr>
+</thead>
+<tbody>
+                        ${data.table_data.map(row => `<tr><td>${row.date}</td><td>${row.rate}</td></tr>`).join('')}
+</tbody>
+</table>
+            `;
+        document.getElementById('tableDiv').innerHTML = tableHtml;
+    } catch (error) {
+        console.error('Error:', error);
+    }
+});
+</script>
+</body>
+</html>
